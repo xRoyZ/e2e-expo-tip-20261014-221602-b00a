@@ -15,8 +15,12 @@ describe('TipCalculatorScreen structure', () => {
     expect(screen.getByTestId('input-people')).toBeTruthy();
   });
 
-  it('renders the three result rows', async () => {
+  it('renders the three result rows for a valid input', async () => {
     await render(<TipCalculatorScreen />);
+
+    await fireEvent.changeText(screen.getByTestId('input-amount'), '100');
+    await fireEvent.changeText(screen.getByTestId('input-tip-percent'), '10');
+    await fireEvent.changeText(screen.getByTestId('input-people'), '3');
 
     expect(screen.getByTestId('result-tip')).toBeTruthy();
     expect(screen.getByTestId('result-total')).toBeTruthy();

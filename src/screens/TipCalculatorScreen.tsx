@@ -59,42 +59,50 @@ function LabelledField({ label, value, onChangeText, onBlur, placeholder, suffix
   );
 }
 
+type ResultState = 'valid' | 'empty' | 'invalid';
+
 interface ResultCardProps {
   result: TipResult;
   people: string;
-  showValues: boolean;
+  state: ResultState;
 }
 
-function ResultCard({ result, people, showValues }: ResultCardProps) {
-  const value = (cents: number) => (showValues ? formatCents(cents) : '');
-
+function ResultCard({ result, people, state }: ResultCardProps) {
   return (
     <View style={styles.card}>
       <Text style={styles.cardHeader}>Ergebnis</Text>
 
-      <View style={styles.resultRow} testID="result-tip">
-        <Text style={styles.rowLabel}>Trinkgeld</Text>
-        <Text style={styles.rowValueSecondary}>{value(result.tipCents)}</Text>
-      </View>
+      {state === 'valid' ? (
+        <>
+          <View style={styles.resultRow} testID="result-tip">
+            <Text style={styles.rowLabel}>Trinkgeld</Text>
+            <Text style={styles.rowValueSecondary}>{formatCents(result.tipCents)}</Text>
+          </View>
 
-      <View style={styles.divider} />
+          <View style={styles.divider} />
 
-      <View style={styles.resultRow} testID="result-total">
-        <Text style={styles.rowLabel}>Gesamt</Text>
-        <Text style={styles.rowValuePrimary}>{value(result.totalCents)}</Text>
-      </View>
+          <View style={styles.resultRow} testID="result-total">
+            <Text style={styles.rowLabel}>Gesamt</Text>
+            <Text style={styles.rowValuePrimary}>{formatCents(result.totalCents)}</Text>
+          </View>
 
-      <View style={styles.divider} />
+          <View style={styles.divider} />
 
-      <View style={styles.resultRow} testID="result-per-person">
-        <View style={styles.rowLabelBlock}>
-          <Text style={styles.rowLabel}>Pro Person</Text>
-          {showValues && people.trim() !== '' ? (
-            <Text style={styles.rowSubLabel}>auf {people} Personen aufgeteilt</Text>
-          ) : null}
-        </View>
-        <Text style={styles.rowValueSecondary}>{value(result.perPersonCents)}</Text>
-      </View>
+          <View style={styles.resultRow} testID="result-per-person">
+            <View style={styles.rowLabelBlock}>
+              <Text style={styles.rowLabel}>Pro Person</Text>
+              {people.trim() !== '' ? (
+                <Text style={styles.rowSubLabel}>auf {people} Personen aufgeteilt</Text>
+              ) : null}
+            </View>
+            <Text style={styles.rowValueSecondary}>{formatCents(result.perPersonCents)}</Text>
+          </View>
+        </>
+      ) : state === 'empty' ? (
+        <Text style={styles.emptyStateText}>Ergebnis erscheint hier.</Text>
+      ) : (
+        <Text style={styles.invalidStateText}>Kein Ergebnis — bitte Eingaben prüfen.</Text>
+      )}
     </View>
   );
 }
@@ -123,6 +131,9 @@ export default function TipCalculatorScreen() {
     }
     return result.errors.find((error) => error.field === field);
   };
+
+  const touchedAny = Object.values(touched).some(Boolean);
+  const resultState: ResultState = result.errors.length === 0 ? 'valid' : touchedAny ? 'invalid' : 'empty';
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -171,7 +182,7 @@ export default function TipCalculatorScreen() {
               error={errorFor('people')}
             />
 
-            <ResultCard result={result} people={input.people} showValues={result.errors.length === 0} />
+            <ResultCard result={result} people={input.people} state={resultState} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -264,6 +275,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginBottom: spacing.space3,
+  },
+  emptyStateText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizeLabel,
+    color: colors.muted,
+  },
+  invalidStateText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizeLabel,
+    color: colors.error,
   },
   resultRow: {
     flexDirection: 'row',
