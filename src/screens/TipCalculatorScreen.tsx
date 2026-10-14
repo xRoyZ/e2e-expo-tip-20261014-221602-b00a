@@ -20,6 +20,7 @@ interface FieldProps {
   label: string;
   value: string;
   onChangeText: (text: string) => void;
+  onBlur: () => void;
   placeholder: string;
   suffix?: string;
   keyboardType: TextInputProps['keyboardType'];
@@ -29,26 +30,28 @@ interface FieldProps {
   error?: TipError;
 }
 
-function LabelledField({ label, value, onChangeText, placeholder, suffix, keyboardType, inputMode, testID, accessibilityLabel, error }: FieldProps) {
+function LabelledField({ label, value, onChangeText, onBlur, placeholder, suffix, keyboardType, inputMode, testID, accessibilityLabel, error }: FieldProps) {
   return (
     <View style={styles.fieldGroup}>
       <Text style={styles.label}>{label}</Text>
-      <View style={styles.inputRow}>
+      <View style={[styles.inputRow, error ? styles.inputRowError : null]}>
         <TextInput
           style={styles.input}
           value={value}
           onChangeText={onChangeText}
+          onBlur={onBlur}
           placeholder={placeholder}
           placeholderTextColor={colors.muted}
           keyboardType={keyboardType}
           inputMode={inputMode}
           testID={testID}
           accessibilityLabel={accessibilityLabel}
+          accessibilityHint={error ? error.message : undefined}
         />
         {suffix ? <Text style={styles.suffix}>{suffix}</Text> : null}
       </View>
       {error ? (
-        <Text style={styles.errorText} accessibilityLiveRegion="polite">
+        <Text style={styles.errorText} accessibilityLiveRegion="polite" testID={`${testID}-error`}>
           {error.message}
         </Text>
       ) : null}
@@ -59,23 +62,26 @@ function LabelledField({ label, value, onChangeText, placeholder, suffix, keyboa
 interface ResultCardProps {
   result: TipResult;
   people: string;
+  showValues: boolean;
 }
 
-function ResultCard({ result, people }: ResultCardProps) {
+function ResultCard({ result, people, showValues }: ResultCardProps) {
+  const value = (cents: number) => (showValues ? formatCents(cents) : '');
+
   return (
     <View style={styles.card}>
       <Text style={styles.cardHeader}>Ergebnis</Text>
 
       <View style={styles.resultRow} testID="result-tip">
         <Text style={styles.rowLabel}>Trinkgeld</Text>
-        <Text style={styles.rowValueSecondary}>{formatCents(result.tipCents)}</Text>
+        <Text style={styles.rowValueSecondary}>{value(result.tipCents)}</Text>
       </View>
 
       <View style={styles.divider} />
 
       <View style={styles.resultRow} testID="result-total">
         <Text style={styles.rowLabel}>Gesamt</Text>
-        <Text style={styles.rowValuePrimary}>{formatCents(result.totalCents)}</Text>
+        <Text style={styles.rowValuePrimary}>{value(result.totalCents)}</Text>
       </View>
 
       <View style={styles.divider} />
@@ -83,24 +89,40 @@ function ResultCard({ result, people }: ResultCardProps) {
       <View style={styles.resultRow} testID="result-per-person">
         <View style={styles.rowLabelBlock}>
           <Text style={styles.rowLabel}>Pro Person</Text>
-          {people.trim() !== '' ? (
+          {showValues && people.trim() !== '' ? (
             <Text style={styles.rowSubLabel}>auf {people} Personen aufgeteilt</Text>
           ) : null}
         </View>
-        <Text style={styles.rowValueSecondary}>{formatCents(result.perPersonCents)}</Text>
+        <Text style={styles.rowValueSecondary}>{value(result.perPersonCents)}</Text>
       </View>
     </View>
   );
 }
 
+const UNTOUCHED: Record<TipField, boolean> = {
+  amount: false,
+  tipPercent: false,
+  people: false,
+};
+
 export default function TipCalculatorScreen() {
   const [input, setInput] = useState<TipInput>(EMPTY_INPUT);
+  const [touched, setTouched] = useState<Record<TipField, boolean>>(UNTOUCHED);
   const result = calculateTip(input);
 
+  const touchField = (field: TipField) => {
+    setTouched((previous) => (previous[field] ? previous : { ...previous, [field]: true }));
+  };
   const setField = (field: TipField, value: string) => {
+    touchField(field);
     setInput((previous) => ({ ...previous, [field]: value }));
   };
-  const errorFor = (field: TipField) => result.errors.find((error) => error.field === field);
+  const errorFor = (field: TipField): TipError | undefined => {
+    if (!touched[field]) {
+      return undefined;
+    }
+    return result.errors.find((error) => error.field === field);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -114,6 +136,7 @@ export default function TipCalculatorScreen() {
               label="Betrag"
               value={input.amount}
               onChangeText={(text) => setField('amount', text)}
+              onBlur={() => touchField('amount')}
               placeholder="0,00"
               suffix="€"
               keyboardType="decimal-pad"
@@ -126,6 +149,7 @@ export default function TipCalculatorScreen() {
               label="Trinkgeld"
               value={input.tipPercent}
               onChangeText={(text) => setField('tipPercent', text)}
+              onBlur={() => touchField('tipPercent')}
               placeholder="10"
               suffix="%"
               keyboardType="decimal-pad"
@@ -138,6 +162,7 @@ export default function TipCalculatorScreen() {
               label="Personenzahl"
               value={input.people}
               onChangeText={(text) => setField('people', text)}
+              onBlur={() => touchField('people')}
               placeholder="1"
               keyboardType="number-pad"
               inputMode="numeric"
@@ -146,7 +171,7 @@ export default function TipCalculatorScreen() {
               error={errorFor('people')}
             />
 
-            <ResultCard result={result} people={input.people} />
+            <ResultCard result={result} people={input.people} showValues={result.errors.length === 0} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -195,6 +220,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.space3,
+  },
+  inputRowError: {
+    borderColor: colors.error,
+    backgroundColor: colors.errorBg,
   },
   input: {
     flex: 1,
